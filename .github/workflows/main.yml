@@ -10,7 +10,7 @@ jobs:
       - name: Setup toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          targets: x86_64-unknown-linux-gnu,x86_64-pc-windows-msvc
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2.7.1
@@ -18,11 +18,22 @@ jobs:
       - name: Test
         run: cargo test
 
-      - name: Build
-        run: cargo build --release
+      - name: Build Linux
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Build Windows
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      #- name: Package Release
+      #  if: startsWith(github.ref, 'refs/tags/')
+      #  run: |
+      #    tar -zcvf target/x86_64-unknown-linux-gnu/release/spot_the_diff spot_the_diff-x86_64-linux.tar.gz
+      #    tar -zcvf target/x86_64-pc-windows-msvc/release/spot_the_diff.exe spot_the_diff-x86_64-windows.zip
 
       - name: Release
-        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: target/release/spot_the_diff
+        run: >-
+          gh release create ${{ github.ref_name }}
+          "target/x86_64-unknown-linux-gnu/release/spot_the_diff#Linux"
+          "target/x86_64-pc-windows-msvc/release/spot_the_diff.exe#Windows"
+          --generate-notes
