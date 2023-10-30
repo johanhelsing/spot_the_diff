@@ -1,5 +1,6 @@
 use dify::diff::{self};
 use glob::glob;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use serde::Serialize;
 use std::{collections::HashMap, fs, io::ErrorKind, path::Path};
 
@@ -36,14 +37,18 @@ fn main() -> Result<(), anyhow::Error> {
 
     // todo: compare and report missing tests
 
-    let mut test_results = HashMap::new();
-
-    for latest_test_folder in latest_test_folders {
-        let latest_test_folder = latest_test_folder?;
-        let latest_test_folder = latest_test_folder.to_str().unwrap();
-        let (test_name, diffs) = diff_images_for_test_folder(latest_test_folder)?;
-        test_results.insert(test_name.to_string(), diffs);
-    }
+    let test_results = latest_test_folders
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .map(|latest_test_folder| {
+            let latest_test_folder = latest_test_folder.unwrap();
+            let latest_test_folder = latest_test_folder.to_str().unwrap();
+            let (test_name, diffs) = diff_images_for_test_folder(latest_test_folder)
+                .expect("diffing test images failed");
+            // test_results.insert(test_name.to_string(), diffs);
+            (test_name.to_string(), diffs)
+        })
+        .collect::<HashMap<_, _>>();
 
     // eprintln!("{test_results:#?}");
     let json = serde_json::to_string_pretty(&test_results)?;
@@ -66,7 +71,7 @@ fn diff_images_for_test_folder(
     latest_test_folder: &str,
 ) -> Result<(&str, HashMap<String, Diff>), anyhow::Error> {
     let test_name = file_name(latest_test_folder);
-    eprintln!("\n{test_name}:");
+    // eprintln!("\n{test_name}:");
     let mut diffs = HashMap::new();
     let baseline_test_folder = format!("{BASELINE_FOLDER}/{test_name}");
     let latest_images = glob(&format!("{latest_test_folder}/*.png"))?;
@@ -83,7 +88,7 @@ fn diff_images_for_test_folder(
         let diff_latest_path = format!("{diff_test_folder}/{image_name_without_ext}_latest.png");
 
         if !Path::new(&baseline_image).exists() {
-            eprintln!("        {image_name}: failed, baseline missing");
+            eprintln!("FAILED: {diff_test_folder}/{image_name}, baseline missing");
             diffs.insert(
                 image_name_without_ext.to_string(),
                 Diff {
@@ -116,7 +121,7 @@ fn diff_images_for_test_folder(
         .expect("dify failed");
 
         let result = if image_diff.is_some() {
-            eprintln!("    FAILED: {image_name}");
+            eprintln!("FAILED: {diff_test_folder}/{image_name}");
             // copy the baseline and latest for convenience
             let diff_baseline_path =
                 format!("{diff_test_folder}/{image_name_without_ext}_baseline.png");
@@ -132,7 +137,7 @@ fn diff_images_for_test_folder(
                 diff_image: Some(diff_diff_path),
             }
         } else {
-            eprintln!("    ok: {image_name}");
+            eprintln!("ok: {diff_test_folder}/{image_name}");
             Diff {
                 passed: true,
                 ..Default::default()

@@ -506,6 +506,7 @@ dependencies = [
  "anyhow",
  "dify",
  "glob",
+ "rayon",
  "serde",
  "serde_json",
 ]
