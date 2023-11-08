@@ -1,3 +1,4 @@
+use clap::Parser;
 use dify::diff::{self};
 use glob::glob;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -7,6 +8,13 @@ use std::{collections::HashMap, fs, io::ErrorKind, path::Path};
 const BASELINE_FOLDER: &str = "Baseline";
 const LATEST_FOLDER: &str = "Latest";
 const DIFF_FOLDER: &str = "Diff";
+
+#[derive(Parser)]
+struct Args {
+    /// The threshold for failing an image, higher is less picky!
+    #[clap(short, long, default_value = "0.1")] // todo: finetune default value!
+    threshold: f32,
+}
 
 //make enum?
 #[derive(Default, Debug, Serialize)]
@@ -27,6 +35,8 @@ fn file_name(path: &str) -> &str {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    let args = Args::parse();
+
     if let Err(e) = fs::remove_dir_all(&DIFF_FOLDER) {
         if e.kind() != ErrorKind::NotFound {
             panic!("failed to remove diff folder {e}");
@@ -43,10 +53,10 @@ fn main() -> Result<(), anyhow::Error> {
         .map(|latest_test_folder| {
             let latest_test_folder = latest_test_folder.unwrap();
             let latest_test_folder = latest_test_folder.to_str().unwrap();
-            let (test_name, diffs) = diff_images_for_test_folder(latest_test_folder)
+            let (test_name, diffs) = diff_images_for_test_folder(latest_test_folder, &args)
                 .expect("diffing test images failed");
             // test_results.insert(test_name.to_string(), diffs);
-            (test_name.to_string(), diffs)
+            (test_name, diffs)
         })
         .collect::<HashMap<_, _>>();
 
@@ -69,7 +79,8 @@ fn main() -> Result<(), anyhow::Error> {
 
 fn diff_images_for_test_folder(
     latest_test_folder: &str,
-) -> Result<(&str, HashMap<String, Diff>), anyhow::Error> {
+    args: &Args,
+) -> Result<(String, HashMap<String, Diff>), anyhow::Error> {
     let test_name = file_name(latest_test_folder);
     // eprintln!("\n{test_name}:");
     let mut diffs = HashMap::new();
@@ -108,7 +119,7 @@ fn diff_images_for_test_folder(
             left: &baseline_image,
             right: &latest_image,
             output: &diff_diff_path,
-            threshold: 0.1, // todo: tune
+            threshold: args.threshold,
             // output_image_base: Some(OutputImageBase::RightImage),
             output_image_base: None,
             do_not_check_dimensions: false,
@@ -146,5 +157,5 @@ fn diff_images_for_test_folder(
 
         diffs.insert(image_name_without_ext.to_string(), result);
     }
-    Ok((test_name, diffs))
+    Ok((test_name.to_owned(), diffs))
 }
