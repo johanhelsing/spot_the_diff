@@ -57,6 +57,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create ${{ github.ref_name }}
-          "release-artifacts-ubuntu-latest/target/spot_the_diff#Linux"
-          "release-artifacts-windows-latest/target/spot_the_diff.exe#Windows"
+          "release-artifacts-ubuntu-latest/spot_the_diff#Linux"
+          "release-artifacts-windows-latest/spot_the_diff.exe#Windows"
           --generate-notes
