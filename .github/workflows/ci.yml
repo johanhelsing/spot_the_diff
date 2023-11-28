@@ -3,39 +3,55 @@ on: push
 name: ci
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu,x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2.7.1
+      - run: cargo test
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.7.1
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+            binary-extension: .exe
+    runs-on: ${{ matrix.os }}
+    steps:      
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.1
+      - run: cargo build --release
+      - uses: actions/upload-artifact@v2
+        # if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: release-artifacts-$${ matrix.os }}
+          path: target/release/spot_the_diff${{ matrix.binary-extension }}
 
-      - name: Test
-        run: cargo test
-
-      - name: Build Linux
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Build Windows
-        run: cargo build --release --target x86_64-pc-windows-msvc
-
-      #- name: Package Release
-      #  if: startsWith(github.ref, 'refs/tags/')
-      #  run: |
-      #    tar -zcvf target/x86_64-unknown-linux-gnu/release/spot_the_diff spot_the_diff-x86_64-linux.tar.gz
-      #    tar -zcvf target/x86_64-pc-windows-msvc/release/spot_the_diff.exe spot_the_diff-x86_64-windows.zip
-
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download linux artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: release-artifacts-ubuntu-latest
+      - name: Download windows artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: release-artifacts-windows-latest
+      # - name: Package
+      #   # if: startsWith(github.ref, 'refs/tags/')
+      #   run: |
+      #     tar -zcvf release-artifacts-ubuntu-latest/target/x86_64-unknown-linux-gnu/release/spot_the_diff spot_the_diff-x86_64-linux.tar.gz
+      #     zip -r spot_the_diff-x86_64-windows.zip release-artifacts-windows-latest/target/x86_64-pc-windows-msvc/release/spot_the_diff.exe 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
+        # if: startsWith(github.ref, 'refs/tags/')
         run: >-
           gh release create ${{ github.ref_name }}
-          "target/x86_64-unknown-linux-gnu/release/spot_the_diff#Linux"
-          "target/x86_64-pc-windows-msvc/release/spot_the_diff.exe#Windows"
+          "release-artifacts-ubuntu-latest/target/spot_the_diff#Linux"
+          "release-artifacts-windows-latest/target/spot_the_diff.exe#Windows"
           --generate-notes
