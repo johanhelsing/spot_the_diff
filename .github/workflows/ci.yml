@@ -35,6 +35,7 @@ jobs:
   release:
     needs:
       - build
+      - test
     runs-on: ubuntu-latest
     steps:
       - name: Download linux artifact
