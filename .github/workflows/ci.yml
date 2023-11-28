@@ -33,6 +33,8 @@ jobs:
           path: target/release/spot_the_diff${{ matrix.binary-extension }}
 
   release:
+    needs:
+      - build
     runs-on: ubuntu-latest
     steps:
       - name: Download linux artifact
