@@ -1,5 +1,7 @@
 on: push
 
+name: ci
+
 jobs:
   build:
     runs-on: ubuntu-latest
